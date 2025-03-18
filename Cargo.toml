@@ -1,0 +1,9 @@
+[package]
+name = "xchacha20poly1305stream"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chacha20 = "0.9.1"
+poly1305 = "0.8.0"
+crypto-common = "0.1.6"
