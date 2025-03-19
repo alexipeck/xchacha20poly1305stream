@@ -125,4 +125,5 @@ dependencies = [
  "chacha20",
  "crypto-common",
  "poly1305",
+ "subtle",
 ]
