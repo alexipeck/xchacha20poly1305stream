@@ -23,11 +23,11 @@ fn main() {
     let decryption_result = xchacha20_poly1305_decrypt!(&key, &nonce, &tag, &plaintext);
 
     match decryption_result {
-        Ok(decrypted) => {
+        Some(decrypted) => {
             println!("Decrypted text: {:?}", String::from_utf8_lossy(&decrypted));
             println!("Authentication successful");
         }
-        Err(e) => println!("Authentication failed: {}", e),
+        None => println!("Authentication failed"),
     }
 
     let mut bad_tag = tag;
@@ -36,8 +36,8 @@ fn main() {
     let tampered_result = xchacha20_poly1305_decrypt!(&key, &nonce, &bad_tag, &plaintext);
 
     match tampered_result {
-        Ok(_) => println!("Something went wrong - tampered data was accepted"),
-        Err(e) => println!("Security working correctly: {}", e),
+        Some(_) => println!("Something went wrong - tampered data was accepted"),
+        None => println!("Security working correctly"),
     }
 
     let mut tampered_ciphertext = plaintext.clone();
@@ -47,7 +47,7 @@ fn main() {
         xchacha20_poly1305_decrypt!(&key, &nonce, &tag, &tampered_ciphertext);
 
     match tampered_data_result {
-        Ok(_) => println!("Something went wrong - tampered ciphertext was accepted"),
-        Err(e) => println!("Security working correctly: {}", e),
+        Some(_) => println!("Something went wrong - tampered ciphertext was accepted"),
+        None => println!("Security working correctly"),
     }
 }

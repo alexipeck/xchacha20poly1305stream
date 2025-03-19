@@ -90,9 +90,9 @@ macro_rules! xchacha20_poly1305_decrypt {
         if decryptor.verify_tag($expected_tag) {
             let mut result = $data.clone();
             decryptor.decrypt_chunk(&mut result);
-            Ok(result)
+            Some(result)
         } else {
-            Err("Authentication tag verification failed")
+            None
         }
     }};
 }
