@@ -9,6 +9,7 @@ A Rust implementation of XChaCha20Poly1305 for streaming encryption and authenti
 - **Poly1305**: Strong message authentication
 - **Constant-time tag verification**: Protects against timing attacks
 - **Associated data support**: Authenticate non-encrypted metadata alongside your encrypted content
+- **Authenticated Encryption**: Decryption always includes authentication
 
 ## Installation
 
@@ -18,34 +19,46 @@ This crate is not currently available on crates.io but may be in the future.
 
 The library provides three main macros:
 
-- `xchacha20_poly1305_encrypt!`: Encrypts data in chunks and returns an authentication tag
-- `xchacha20_poly1305_decrypt!`: Decrypts data in chunks and verifies the authentication tag
-- `xchacha20_poly1305_decrypt_simple!`: Simplified version of the decrypt macro
+- `encrypt!`: Encrypts data in chunks and returns an authentication tag
+- `decrypt!`: Decrypts data in chunks and verifies authentication tag, returning a boolean success value
+- `verify!`: Verifies the authentication tag for encrypted data without decrypting
 
 ## Usage Examples
 
 ### Basic Example
 
 ```rust
-use xchacha20poly1305stream::{xchacha20_poly1305_decrypt, xchacha20_poly1305_encrypt};
+use xchacha20poly1305stream::{encrypt, decrypt, verify};
 
 let key = [0x42; 32];
 let nonce = [0x24; 24];
 
 let mut data = b"This is a secret message".to_vec();
 
-let tag = xchacha20_poly1305_encrypt!(&key, &nonce, |streamer| {
+let tag = encrypt!(&key, &nonce, |streamer| {
     streamer.feed(&mut data);
 });
 
-let decryption_result = xchacha20_poly1305_decrypt!(&key, &nonce, &tag, |streamer| {
-    streamer.feed(&mut data);
+let mut decrypted = data.clone();
+let is_authentic = decrypt!(&key, &nonce, &tag, |streamer| {
+    streamer.feed(&mut decrypted);
 });
 
-if decryption_result.is_some() {
-    println!("Successfully decrypted: {}", String::from_utf8_lossy(&data));
+if is_authentic {
+    println!("Successfully decrypted: {}", String::from_utf8_lossy(&decrypted));
 } else {
     println!("Authentication failed");
+}
+
+// Alternatively, you can verify without decrypting
+let verification_result = verify!(&key, &nonce, &tag, |streamer| {
+    streamer.feed(&data);
+});
+
+if verification_result {
+    println!("Data is authentic");
+} else {
+    println!("Data has been tampered with");
 }
 ```
 
@@ -58,18 +71,24 @@ let nonce = [0x24; 24];
 let mut chunk1 = b"First chunk of data".to_vec();
 let mut chunk2 = b"Second chunk of data".to_vec();
 
-let tag = xchacha20_poly1305_encrypt!(&key, &nonce, |streamer| {
+let tag = encrypt!(&key, &nonce, |streamer| {
     streamer.feed(&mut chunk1);
     streamer.feed(&mut chunk2);
 });
 
-let result = xchacha20_poly1305_decrypt!(&key, &nonce, &tag, |streamer| {
-    streamer.feed(&mut chunk1);
-    streamer.feed(&mut chunk2);
+// Clone for decryption
+let mut decrypted1 = chunk1.clone();
+let mut decrypted2 = chunk2.clone();
+
+let is_authentic = decrypt!(&key, &nonce, &tag, |streamer| {
+    streamer.feed(&mut decrypted1);
+    streamer.feed(&mut decrypted2);
 });
 
-if result.is_some() {
-    println!("Authentication successful");
+if is_authentic {
+    println!("Authentication successful and data decrypted");
+    println!("Chunk 1: {}", String::from_utf8_lossy(&decrypted1));
+    println!("Chunk 2: {}", String::from_utf8_lossy(&decrypted2));
 } else {
     println!("Authentication failed");
 }
@@ -84,16 +103,22 @@ let nonce = [0x24; 24];
 let mut message = b"Secret message".to_vec();
 let associated_data = b"Public metadata".to_vec();
 
-let tag = xchacha20_poly1305_encrypt!(&key, &nonce, |streamer| {
+let tag = encrypt!(&key, &nonce, |streamer| {
     streamer.add_associated_data(&associated_data);
     streamer.feed(&mut message);
 });
 
-let result = xchacha20_poly1305_decrypt!(&key, &nonce, &tag, |streamer| {
+let mut decrypted = message.clone();
+let is_authentic = decrypt!(&key, &nonce, &tag, |streamer| {
     streamer.add_associated_data(&associated_data);
-    streamer.feed(&mut message);
+    streamer.feed(&mut decrypted);
 });
 
+if is_authentic {
+    println!("Successfully decrypted with associated data: {}", String::from_utf8_lossy(&decrypted));
+} else {
+    println!("Authentication failed");
+}
 // Authentication will fail if associated data doesn't match
 ```
 
@@ -103,7 +128,8 @@ let result = xchacha20_poly1305_decrypt!(&key, &nonce, &tag, |streamer| {
 - The order of operations matters:
   - Call `add_associated_data` before `feed` for both encryption and decryption
   - Process data chunks in the same order during decryption as during encryption
-- Authentication will fail if any part of the ciphertext, tag, or associated data is tampered with
+- Authentication is always performed during decryption to ensure data integrity and authenticity
+- The library will not decrypt data that fails authentication
 
 ## Performance Considerations
 

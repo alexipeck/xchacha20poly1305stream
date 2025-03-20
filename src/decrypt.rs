@@ -44,8 +44,9 @@ impl Decryptor {
 
 #[macro_export]
 macro_rules! decrypt {
-    ($key:expr, $nonce:expr, |$decryptor:ident| $body:block) => {{
+    ($key:expr, $nonce:expr, $expected_tag:expr, |$decryptor:ident| $body:block) => {{
         let mut $decryptor = $crate::decrypt::Decryptor::new($key, $nonce);
         $body
+        $decryptor.verify_tag($expected_tag)
     }};
 }
