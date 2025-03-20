@@ -6,7 +6,7 @@ fn main() {
     let mut data = vec![1u8, 2, 3, 4, 5];
 
     let tag = xchacha20_poly1305_encrypt!(&key, &nonce, |streamer| {
-        streamer.encrypt_chunk(&mut data);
+        streamer.feed(&mut data);
     });
 
     println!("{:02x?}", tag);
