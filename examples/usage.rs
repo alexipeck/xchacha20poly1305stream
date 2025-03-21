@@ -1,4 +1,4 @@
-use xchacha20poly1305stream::{decrypt, encrypt, verify};
+use xchacha20poly1305stream::{authenticate, decrypt, encrypt};
 
 fn main() {
     println!("\n===== BASIC ENCRYPTION AND DECRYPTION =====");
@@ -32,8 +32,8 @@ fn main() {
         println!("Authentication failed - decryption insecure");
     }
 
-    // Example 2: Using verify macro only (for verification without decryption)
-    let verification = verify!(&key, &nonce, &tag, |streamer| {
+    // Example 2: Using authenticate macro only (for verification without decryption)
+    let verification = authenticate!(&key, &nonce, &tag, |streamer| {
         streamer.feed(&data);
     });
 

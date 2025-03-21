@@ -1,6 +1,7 @@
 use crate::authenticate::Authenticator;
 use crate::decrypt::Decryptor;
 use crate::encrypt::Encryptor;
+use crate::tag::Tagger;
 use crate::*;
 
 #[test]
@@ -41,7 +42,7 @@ fn test_tampered_tag_detection() {
 
     let mut decrypted = ciphertext.clone();
 
-    let verification = verify!(&key, &nonce, &bad_tag, |streamer| {
+    let verification = authenticate!(&key, &nonce, &bad_tag, |streamer| {
         streamer.feed(&mut decrypted);
     });
 
@@ -62,7 +63,7 @@ fn test_tampered_ciphertext_detection() {
     let mut tampered_ciphertext = ciphertext.clone();
     tampered_ciphertext[0] ^= 1;
 
-    let verification = verify!(&key, &nonce, &tag, |streamer| {
+    let verification = authenticate!(&key, &nonce, &tag, |streamer| {
         streamer.feed(&mut tampered_ciphertext);
     });
 
@@ -125,7 +126,7 @@ fn test_different_keys_and_nonces() {
     assert_ne!(tag1, tag2);
 
     let mut cross_ciphertext = ciphertext2.clone();
-    let cross_verify = verify!(&key1, &nonce1, &tag1, |streamer| {
+    let cross_verify = authenticate!(&key1, &nonce1, &tag1, |streamer| {
         streamer.feed(&mut cross_ciphertext);
     });
     assert!(!cross_verify);
@@ -233,7 +234,7 @@ fn test_authentication_failure_with_partial_data() {
     let mut decrypt1 = chunk1.clone();
     let mut decrypt2 = chunk2.clone();
 
-    let verification = verify!(&key, &nonce, &tag, |streamer| {
+    let verification = authenticate!(&key, &nonce, &tag, |streamer| {
         streamer.feed(&mut decrypt1);
         streamer.feed(&mut decrypt2);
     });
@@ -404,4 +405,80 @@ fn test_combined_decrypt_authentication() {
     });
 
     assert!(!tampered_result);
+}
+
+#[test]
+fn test_tag_generation() {
+    let key = [0x42; 32];
+    let nonce = [0x24; 24];
+    let data = b"This is data for tag generation".to_vec();
+
+    let tag = tag!(&key, &nonce, |tagger| {
+        tagger.feed(&data);
+    });
+
+    assert_eq!(tag.len(), 16);
+
+    let verification = authenticate!(&key, &nonce, &tag, |authenticator| {
+        authenticator.feed(&data);
+    });
+
+    assert!(verification);
+
+    let mut tampered_data = data.clone();
+    tampered_data[0] ^= 1;
+
+    let verification_tampered = authenticate!(&key, &nonce, &tag, |authenticator| {
+        authenticator.feed(&tampered_data);
+    });
+
+    assert!(!verification_tampered);
+}
+
+#[test]
+fn test_streaming_tag_generation() {
+    let key = [0x42; 32];
+    let nonce = [0x24; 24];
+    let data1 = b"First chunk for tagging".to_vec();
+    let data2 = b"Second chunk for tagging".to_vec();
+    let data3 = b"Third chunk for tagging".to_vec();
+
+    let tag = tag!(&key, &nonce, |tagger| {
+        tagger.feed(&data1);
+        tagger.feed(&data2);
+        tagger.feed(&data3);
+    });
+
+    assert_eq!(tag.len(), 16);
+
+    let verification = authenticate!(&key, &nonce, &tag, |authenticator| {
+        authenticator.feed(&data1);
+        authenticator.feed(&data2);
+        authenticator.feed(&data3);
+    });
+
+    assert!(verification);
+}
+
+#[test]
+fn test_tag_equivalence() {
+    let key = [0x42; 32];
+    let nonce = [0x24; 24];
+    let data = b"Testing tag equivalence".to_vec();
+
+    let tag1 = tag!(&key, &nonce, |tagger| {
+        tagger.feed(&data);
+    });
+
+    let mut authenticator = Authenticator::new(&key, &nonce);
+    authenticator.feed(&data);
+    let tag2 = authenticator.verify_tag(&tag1);
+
+    assert!(tag2);
+
+    let mut tagger = Tagger::new(&key, &nonce);
+    tagger.feed(&data);
+    let tag3 = tagger.finalize_tag();
+
+    assert_eq!(tag1, tag3);
 }

@@ -10,6 +10,7 @@ A Rust implementation of XChaCha20Poly1305 for streaming encryption and authenti
 - **Constant-time tag verification**: Protects against timing attacks
 - **Associated data support**: Authenticate non-encrypted metadata alongside your encrypted content
 - **Authenticated Encryption**: Decryption always includes authentication
+- **Tag-only mode**: Generate Poly1305 authentication tags without encryption
 
 ## Installation
 
@@ -17,18 +18,19 @@ This crate is not currently available on crates.io but may be in the future.
 
 ## API Overview
 
-The library provides three main macros:
+The library provides four main macros:
 
 - `encrypt!`: Encrypts data in chunks and returns an authentication tag
 - `decrypt!`: Decrypts data in chunks and verifies authentication tag, returning a boolean success value
-- `verify!`: Verifies the authentication tag for encrypted data without decrypting
+- `authenticate!`: Verifies the authentication tag for encrypted data without decrypting
+- `tag!`: Generates a Poly1305 authentication tag without encryption
 
 ## Usage Examples
 
 ### Basic Example
 
 ```rust
-use xchacha20poly1305stream::{encrypt, decrypt, verify};
+use xchacha20poly1305stream::{encrypt, decrypt, authenticate};
 
 let key = [0x42; 32];
 let nonce = [0x24; 24];
@@ -51,7 +53,7 @@ if is_authentic {
 }
 
 // Alternatively, you can verify without decrypting
-let verification_result = verify!(&key, &nonce, &tag, |streamer| {
+let verification_result = authenticate!(&key, &nonce, &tag, |streamer| {
     streamer.feed(&data);
 });
 
@@ -122,6 +124,32 @@ if is_authentic {
 // Authentication will fail if associated data doesn't match
 ```
 
+### Generating Authentication Tags Without Encryption
+
+```rust
+use xchacha20poly1305stream::tag;
+
+let key = [0x42; 32];
+let nonce = [0x24; 24];
+let data = b"Data to authenticate".to_vec();
+
+// Generate a tag without encrypting the data
+let auth_tag = tag!(&key, &nonce, |tagger| {
+    tagger.feed(&data);
+});
+
+// Verify the tag
+let is_valid = authenticate!(&key, &nonce, &auth_tag, |verifier| {
+    verifier.feed(&data);
+});
+
+if is_valid {
+    println!("Data integrity verified");
+} else {
+    println!("Data integrity check failed");
+}
+```
+
 ## Security Notes
 
 - Always use a unique nonce for each encryption with the same key
@@ -151,6 +179,7 @@ The tests cover:
 - Tampered ciphertext detection
 - Streaming encryption
 - Associated data handling
+- Tag generation without encryption
 
 ## License
 

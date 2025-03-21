@@ -41,7 +41,7 @@ impl Authenticator {
 }
 
 #[macro_export]
-macro_rules! verify {
+macro_rules! authenticate {
     ($key:expr, $nonce:expr, $expected_tag:expr, |$streamer:ident| $body:block) => {{
         let mut $streamer = $crate::authenticate::Authenticator::new($key, $nonce);
         $body
